@@ -52,16 +52,36 @@ runtime = Runtime(
 )
 
 result = await runtime.run(rag_pipeline, docs, question)
+await runtime.aclose()
+
+# Or stream tokens from an LLM task:
+@ai_task(kind="llm_remote", model="gpt-4.1-mini", stream=True)
+async def stream_answer(question: str, context: str):
+    async for chunk in client.stream_chat(...):
+        yield chunk
+
+@pipeline
+async def streaming_pipeline(docs: list[str], question: str):
+    chunks = chunk_docs(docs)
+    vecs = await embed_chunks.map(chunks, preferred_batch_size=64)
+    async for token in stream_answer(question, str(vecs[:5])):
+        yield token
+
+async with Runtime() as runtime:
+    gen = await runtime.run(streaming_pipeline, docs, "What?")
+    async for token in gen:
+        print(token, end="", flush=True)
 ```
 
 ## Core concepts
 
 | Concept | Description |
 |---------|-------------|
-| `@ai_task` | Decorates a function with scheduling metadata (`kind`, `device`, `batchable`, etc.) |
+| `@ai_task` | Decorates a function with scheduling metadata (`kind`, `device`, `batchable`, `stream`, etc.) |
 | `@pipeline` | Decorates an async function or async generator as an orchestrated flow |
 | `task.map(items)` | Fan-out a task over a collection with automatic batching |
-| `Runtime` | Wires the event loop, thread pool, GPU workers, and rate limiters |
+| `stream=True` | Tasks that `yield` tokens bypass the scheduler — callers consume via `async for` |
+| `Runtime` | Wires the event loop, thread pool, GPU workers, rate limiters, and retry policy |
 
 ## Running tests
 

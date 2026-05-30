@@ -47,6 +47,8 @@ class Task(Generic[P, R]):
         ctx = get_current_context()
         if ctx is None:
             return self._fn(*args, **kwargs)
+        if self.meta.stream:
+            return self._fn(*args, **kwargs)
         if inspect.iscoroutinefunction(self._fn) or inspect.isasyncgenfunction(self._fn):
             return ctx.scheduler.submit(self, args, kwargs)  # type: ignore[return-value]
         return self._fn(*args, **kwargs)
