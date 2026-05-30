@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Iterator
 
 
 @dataclass
@@ -32,7 +32,7 @@ class MetricsCollector:
         self._stats: dict[str, TaskStats] = {}
         self._exporter = self._build_exporter(backend, namespace)
 
-    def _build_exporter(self, backend: str, namespace: str):
+    def _build_exporter(self, backend: str, namespace: str) -> Any:
         if backend == "prometheus":
             from castellum.metrics.prometheus import PrometheusExporter
             return PrometheusExporter(namespace=namespace)
@@ -42,7 +42,7 @@ class MetricsCollector:
         return None
 
     @contextmanager
-    def task_timer(self, task_name: str):
+    def task_timer(self, task_name: str) -> Iterator[None]:
         start = time.perf_counter()
         stats = self._stats.setdefault(task_name, TaskStats())
         try:
@@ -61,7 +61,7 @@ class MetricsCollector:
     def snapshot(self) -> dict[str, TaskStats]:
         return dict(self._stats)
 
-    def current_span(self):
+    def current_span(self) -> _NoopSpan:
         return _NoopSpan()
 
 

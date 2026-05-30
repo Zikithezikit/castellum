@@ -15,7 +15,7 @@ class AnthropicClient(LLMClient):
         timeout: float = 60.0,
     ) -> None:
         try:
-            from anthropic import AsyncAnthropic
+            from anthropic import AsyncAnthropic  # type: ignore[import-not-found]
         except ImportError as e:
             raise ImportError("Install 'castellum[anthropic]' to use AnthropicClient.") from e
 
@@ -36,7 +36,7 @@ class AnthropicClient(LLMClient):
             messages=messages,
             **kwargs,
         )
-        return response.content[0].text
+        return str(response.content[0].text)
 
     async def stream_chat(
         self,

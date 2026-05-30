@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Generator
 from typing import Any, Generic, TypeVar, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -12,7 +13,7 @@ R = TypeVar("R")
 class MapProxy(Generic[R]):
     def __init__(
         self,
-        task: "Task",
+        task: Task[..., R],
         iterable: list[Any],
         batch_size: int,
         concurrency: int | None,
@@ -22,7 +23,7 @@ class MapProxy(Generic[R]):
         self._batch_size = batch_size
         self._concurrency = concurrency
 
-    def __await__(self):
+    def __await__(self) -> Generator[Any, None, list[R]]:
         return self._run().__await__()
 
     async def _run(self) -> list[R]:

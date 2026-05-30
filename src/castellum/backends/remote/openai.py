@@ -15,7 +15,7 @@ class OpenAIClient(LLMClient):
         timeout: float = 60.0,
     ) -> None:
         try:
-            from openai import AsyncOpenAI
+            from openai import AsyncOpenAI  # type: ignore[import-not-found]
         except ImportError as e:
             raise ImportError("Install 'castellum[openai]' to use OpenAIClient.") from e
 

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic, ParamSpec, TypeVar, overload
+from typing import Any, Generic, ParamSpec, TypeVar, TYPE_CHECKING, overload
+
+if TYPE_CHECKING:
+    from castellum.core.map import MapProxy
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -28,7 +31,7 @@ class TaskMeta:
     stream: bool = False
     backend: Any = None
     timeout: float | None = None
-    retry_policy: dict | None = None
+    retry_policy: dict[str, Any] | None = None
 
 
 class Task(Generic[P, R]):
@@ -44,16 +47,18 @@ class Task(Generic[P, R]):
         ctx = get_current_context()
         if ctx is None:
             return self._fn(*args, **kwargs)
-        return ctx.scheduler.submit(self, args, kwargs)
+        if inspect.iscoroutinefunction(self._fn) or inspect.isasyncgenfunction(self._fn):
+            return ctx.scheduler.submit(self, args, kwargs)  # type: ignore[return-value]
+        return self._fn(*args, **kwargs)
 
     def map(
         self,
-        iterable,
+        iterable: Iterable[Any],
         *,
         batch_size: int | None = None,
         preferred_batch_size: int | None = None,
         concurrency: int | None = None,
-    ) -> "MapProxy[R]":
+    ) -> MapProxy[R]:
         from castellum.core.map import MapProxy
 
         effective_batch = batch_size or preferred_batch_size or self.meta.max_batch_size
@@ -83,13 +88,23 @@ def ai_task(
     stream: bool = False,
     backend: Any = None,
     timeout: float | None = None,
-    retry_policy: dict | None = None,
+    retry_policy: dict[str, Any] | None = None,
 ) -> Callable[[Callable[P, R]], Task[P, R]]: ...
 
 
-def ai_task(fn=None, *, kind=TaskKind.PREPROCESS, device="cpu",
-            batchable=False, max_batch_size=1, model=None,
-            stream=False, backend=None, timeout=None, retry_policy=None):
+def ai_task(
+    fn: Callable[P, R] | None = None,
+    *,
+    kind: str | TaskKind = TaskKind.PREPROCESS,
+    device: str = "cpu",
+    batchable: bool = False,
+    max_batch_size: int = 1,
+    model: str | None = None,
+    stream: bool = False,
+    backend: Any = None,
+    timeout: float | None = None,
+    retry_policy: dict[str, Any] | None = None,
+) -> Task[P, R] | Callable[[Callable[P, R]], Task[P, R]]:
     meta = TaskMeta(
         kind=TaskKind(kind),
         device=device,

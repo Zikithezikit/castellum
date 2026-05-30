@@ -4,7 +4,7 @@ from __future__ import annotations
 class OtelExporter:
     def __init__(self, *, namespace: str) -> None:
         try:
-            from opentelemetry import metrics as otel_metrics
+            from opentelemetry import metrics as otel_metrics  # type: ignore[import-not-found]
         except ImportError as e:
             raise ImportError("Install 'castellum[otel]' for OpenTelemetry support.") from e
 

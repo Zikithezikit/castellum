@@ -13,5 +13,5 @@ class VectorStoreBackend(ABC):
     async def fetch_texts(self, ids: list[Any]) -> list[str]:
         ...
 
-    async def upsert(self, ids: list[Any], vectors: list[list[float]], payloads: list[dict]) -> None:
+    async def upsert(self, ids: list[Any], vectors: list[list[float]], payloads: list[dict[str, Any]]) -> None:
         raise NotImplementedError

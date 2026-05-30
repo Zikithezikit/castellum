@@ -23,7 +23,7 @@ class Runtime:
         tokens_per_minute_limit: int | None = None,
         remote_limits: dict[str, dict[str, int]] | None = None,
         default_timeout_seconds: float = 60.0,
-        retry_policy: dict | None = None,
+        retry_policy: dict[str, Any] | None = None,
         metrics_backend: str = "none",
         metrics_namespace: str = "castellum",
         enable_traces: bool = False,
@@ -45,16 +45,16 @@ class Runtime:
             metrics=self._metrics,
         )
 
-    async def run(self, pipe: "Pipeline", *args: Any, **kwargs: Any) -> Any:
+    async def run(self, pipe: "Pipeline[..., Any]", *args: Any, **kwargs: Any) -> Any:
         run_id = str(uuid.uuid4())
         ctx = PipelineContext(scheduler=self._scheduler, run_id=run_id)
-        token = set_current_context(ctx)
+        set_current_context(ctx)
         try:
             return await pipe._execute(*args, **kwargs)
         finally:
             set_current_context(None)
 
-    def run_sync(self, pipe: "Pipeline", *args: Any, **kwargs: Any) -> Any:
+    def run_sync(self, pipe: "Pipeline[..., Any]", *args: Any, **kwargs: Any) -> Any:
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:

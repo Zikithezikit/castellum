@@ -38,11 +38,11 @@ class Scheduler:
         self._retry_policy = retry_policy
         self._metrics = metrics
 
-    async def submit(self, task: Task, args: tuple, kwargs: dict) -> Any:
+    async def submit(self, task: Task[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
         timeout = task.meta.timeout or self._default_timeout
         retry_policy = RetryPolicy(**(task.meta.retry_policy or {})) if task.meta.retry_policy else self._retry_policy
 
-        async def _dispatch():
+        async def _dispatch() -> Any:
             kind = task.meta.kind
             if kind == TaskKind.LLM_REMOTE:
                 return await self._run_remote(task, args, kwargs)
@@ -61,7 +61,7 @@ class Scheduler:
 
     async def map(
         self,
-        task: Task,
+        task: Task[..., Any],
         items: list[Any],
         *,
         batch_size: int,
@@ -72,11 +72,11 @@ class Scheduler:
         else:
             return await self._map_individual(task, items, concurrency=concurrency)
 
-    async def _map_batched(self, task: Task, items: list, *, batch_size: int, concurrency: int | None) -> list:
+    async def _map_batched(self, task: Task[..., Any], items: list[Any], *, batch_size: int, concurrency: int | None) -> list[Any]:
         batches = [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
         sem = asyncio.Semaphore(concurrency) if concurrency else None
 
-        async def run_batch(batch):
+        async def run_batch(batch: list[Any]) -> Any:
             if sem:
                 async with sem:
                     return await self.submit(task, (batch,), {})
@@ -85,7 +85,7 @@ class Scheduler:
         async with asyncio.TaskGroup() as tg:
             coros = [tg.create_task(run_batch(b)) for b in batches]
 
-        result = []
+        result: list[Any] = []
         for t in coros:
             r = t.result()
             if isinstance(r, list):
@@ -94,10 +94,10 @@ class Scheduler:
                 result.append(r)
         return result
 
-    async def _map_individual(self, task: Task, items: list, *, concurrency: int | None) -> list:
+    async def _map_individual(self, task: Task[..., Any], items: list[Any], *, concurrency: int | None) -> list[Any]:
         sem = asyncio.Semaphore(concurrency) if concurrency else None
 
-        async def run_one(item):
+        async def run_one(item: Any) -> Any:
             if sem:
                 async with sem:
                     return await self.submit(task, (item,), {})
@@ -108,14 +108,14 @@ class Scheduler:
 
         return [t.result() for t in tasks]
 
-    async def _run_cpu(self, task: Task, args: tuple, kwargs: dict) -> Any:
+    async def _run_cpu(self, task: Task[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             self._executor,
             lambda: task._fn(*args, **kwargs),
         )
 
-    async def _run_gpu(self, task: Task, args: tuple, kwargs: dict) -> Any:
+    async def _run_gpu(self, task: Task[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
         async with self._gpu_sem:
             loop = asyncio.get_running_loop()
             return await loop.run_in_executor(
@@ -123,10 +123,10 @@ class Scheduler:
                 lambda: task._fn(*args, **kwargs),
             )
 
-    async def _run_async(self, task: Task, args: tuple, kwargs: dict) -> Any:
+    async def _run_async(self, task: Task[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
         return await task._fn(*args, **kwargs)
 
-    async def _run_remote(self, task: Task, args: tuple, kwargs: dict) -> Any:
+    async def _run_remote(self, task: Task[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
         model = task.meta.model
 
         async with self._remote_sem:

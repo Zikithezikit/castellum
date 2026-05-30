@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import contextvars
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
 class PipelineContext:
     scheduler: "Scheduler"
     run_id: str
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
 
 
 _current_context: contextvars.ContextVar[PipelineContext | None] = \

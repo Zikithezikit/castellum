@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import httpx
 from typing import Any
+
+import httpx
 
 
 class AsyncHTTPClient:
@@ -12,7 +13,7 @@ class AsyncHTTPClient:
             timeout=timeout,
         )
 
-    async def post(self, path: str, *, json: dict, stream: bool = False) -> Any:
+    async def post(self, path: str, *, json: dict[str, Any], stream: bool = False) -> Any:
         if stream:
             return self._client.stream("POST", path, json=json)
         response = await self._client.post(path, json=json)
@@ -22,8 +23,8 @@ class AsyncHTTPClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AsyncHTTPClient":
         return self
 
-    async def __aexit__(self, *_):
+    async def __aexit__(self, *_: Any) -> None:
         await self.aclose()

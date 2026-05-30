@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import Any
 
 
 class BatchCollector:
     def __init__(
         self,
-        handler,
+        handler: Callable[[list[Any]], Any],
         *,
         max_batch_size: int = 128,
         flush_timeout: float = 0.005,
@@ -15,13 +16,13 @@ class BatchCollector:
         self._handler = handler
         self._max = max_batch_size
         self._timeout = flush_timeout
-        self._pending: list[tuple[Any, asyncio.Future]] = []
+        self._pending: list[tuple[Any, asyncio.Future[Any]]] = []
         self._lock = asyncio.Lock()
-        self._flush_task: asyncio.Task | None = None
+        self._flush_task: asyncio.Task[None] | None = None
 
     async def add(self, item: Any) -> Any:
         loop = asyncio.get_running_loop()
-        fut: asyncio.Future = loop.create_future()
+        fut: asyncio.Future[Any] = loop.create_future()
 
         async with self._lock:
             self._pending.append((item, fut))

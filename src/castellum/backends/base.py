@@ -17,7 +17,7 @@ class LLMClient(ABC):
         ...
 
     @abstractmethod
-    async def stream_chat(
+    def stream_chat(
         self,
         *,
         model: str,

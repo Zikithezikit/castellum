@@ -4,7 +4,7 @@ from __future__ import annotations
 class PrometheusExporter:
     def __init__(self, *, namespace: str) -> None:
         try:
-            from prometheus_client import Counter, Histogram
+            from prometheus_client import Counter, Histogram  # type: ignore[import-not-found]
         except ImportError as e:
             raise ImportError("Install 'castellum[prometheus]' for Prometheus support.") from e
 
