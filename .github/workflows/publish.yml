@@ -29,7 +29,7 @@ jobs:
         run: uv run ruff check src/ tests/ examples/ demo.py
 
       - name: Type check with mypy
-        run: uv run mypy src/
+        run: uv run mypy src/ demo.py
 
       - name: Run tests
         run: uv run pytest -v --cov=src/castellum --cov-report=xml

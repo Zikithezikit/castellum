@@ -110,7 +110,9 @@ anthropic = [
     { name = "anthropic" },
 ]
 dev = [
+    { name = "anthropic" },
     { name = "mypy" },
+    { name = "openai" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -131,10 +133,12 @@ prometheus = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.28" },
+    { name = "anthropic", marker = "extra == 'dev'", specifier = ">=0.28" },
     { name = "anyio", specifier = ">=4.3" },
     { name = "castellum", extras = ["openai", "anthropic", "prometheus", "otel"], marker = "extra == 'all'" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
+    { name = "openai", marker = "extra == 'dev'", specifier = ">=1.30" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.30" },
     { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.24" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.24" },

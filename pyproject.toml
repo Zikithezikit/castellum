@@ -43,6 +43,8 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
     "respx>=0.21",
+    "openai>=1.30",
+    "anthropic>=0.28",
 ]
 all = ["castellum[openai,anthropic,prometheus,otel]"]
 
