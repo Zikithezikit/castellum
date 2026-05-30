@@ -14,23 +14,21 @@ class RateLimiter:
         self._lock = asyncio.Lock()
 
     async def acquire(self, tokens: int = 1) -> None:
-        async with self._lock:
-            now = time.monotonic()
-            elapsed = now - self._last_refill
-            self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
-            self._last_refill = now
+        while True:
+            async with self._lock:
+                now = time.monotonic()
+                elapsed = now - self._last_refill
+                self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
+                self._last_refill = now
 
-            if self._tokens >= tokens:
-                self._tokens -= tokens
-                return
+                if self._tokens >= tokens:
+                    self._tokens -= tokens
+                    return
 
-            deficit = tokens - self._tokens
-            wait = deficit / self._rate
-            self._tokens = 0
+                deficit = tokens - self._tokens
+                wait = deficit / self._rate
 
-        await asyncio.sleep(wait)
-        async with self._lock:
-            self._tokens = max(0.0, self._tokens - tokens)
+            await asyncio.sleep(wait)
 
 
 class ModelRateLimiter:

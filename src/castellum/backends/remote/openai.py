@@ -11,6 +11,7 @@ class OpenAIClient(LLMClient):
         self,
         *,
         api_key: str | None = None,
+        base_url: str | None = None,
         default_model: str = "gpt-4.1-mini",
         timeout: float = 60.0,
     ) -> None:
@@ -19,7 +20,10 @@ class OpenAIClient(LLMClient):
         except ImportError as e:
             raise ImportError("Install 'castellum[openai]' to use OpenAIClient.") from e
 
-        self._client = AsyncOpenAI(api_key=api_key, timeout=timeout)
+        kwargs: dict[str, Any] = {"api_key": api_key, "timeout": timeout}
+        if base_url is not None:
+            kwargs["base_url"] = base_url
+        self._client = AsyncOpenAI(**kwargs)
         self._default_model = default_model
 
     async def chat(

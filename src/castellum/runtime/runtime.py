@@ -1,16 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import uuid
+from collections.abc import AsyncGenerator
 from typing import Any, TYPE_CHECKING
 
 from castellum.core.context import PipelineContext, set_current_context
-from castellum.metrics.collector import MetricsCollector
+from castellum.metrics.collector import MetricsCollector, MetricsBackend
 from castellum.runtime.retry import RetryPolicy
 from castellum.runtime.scheduler import Scheduler
 
 if TYPE_CHECKING:
     from castellum.core.pipeline import Pipeline
+
+
+async def _with_context(
+    gen: AsyncGenerator[Any, None],
+    ctx: PipelineContext,
+) -> AsyncGenerator[Any, None]:
+    try:
+        set_current_context(ctx)
+        async for item in gen:
+            yield item
+    finally:
+        set_current_context(None)
 
 
 class Runtime:
@@ -24,11 +38,20 @@ class Runtime:
         remote_limits: dict[str, dict[str, int]] | None = None,
         default_timeout_seconds: float = 60.0,
         retry_policy: dict[str, Any] | None = None,
-        metrics_backend: str = "none",
+        metrics_backend: str | MetricsBackend = MetricsBackend.NONE,
         metrics_namespace: str = "castellum",
         enable_traces: bool = False,
     ) -> None:
-        self._retry_policy = RetryPolicy(**(retry_policy or {}))
+        if retry_policy:
+            self._retry_policy = RetryPolicy(
+                max_retries=retry_policy.get("max_retries", 3),
+                base_delay=retry_policy.get("base_delay", 0.5),
+                max_delay=retry_policy.get("max_delay", 30.0),
+                jitter=retry_policy.get("jitter", True),
+                retryable_exceptions=retry_policy.get("retryable_exceptions"),
+            )
+        else:
+            self._retry_policy = RetryPolicy()
         self._metrics = MetricsCollector(
             backend=metrics_backend,
             namespace=metrics_namespace,
@@ -50,9 +73,13 @@ class Runtime:
         ctx = PipelineContext(scheduler=self._scheduler, run_id=run_id)
         set_current_context(ctx)
         try:
-            return await pipe._execute(*args, **kwargs)
+            result = await pipe._execute(*args, **kwargs)
+            if pipe._is_generator:
+                return _with_context(result, ctx)
+            return result
         finally:
-            set_current_context(None)
+            if not pipe._is_generator:
+                set_current_context(None)
 
     def run_sync(self, pipe: "Pipeline[..., Any]", *args: Any, **kwargs: Any) -> Any:
         try:
@@ -65,7 +92,14 @@ class Runtime:
                 "runtime.run_sync() cannot be called inside a running event loop. "
                 "Use `await runtime.run(...)` instead."
             )
-        return asyncio.run(self.run(pipe, *args, **kwargs))
+
+        async def _collect() -> Any:
+            result = await self.run(pipe, *args, **kwargs)
+            if inspect.isasyncgen(result):
+                return [token async for token in result]
+            return result
+
+        return asyncio.run(_collect())
 
     async def aclose(self) -> None:
         await self._scheduler.aclose()
@@ -75,3 +109,9 @@ class Runtime:
 
     async def __aexit__(self, *_: Any) -> None:
         await self.aclose()
+
+    def __repr__(self) -> str:
+        return (
+            f"<Runtime cpu={self._scheduler._executor._max_workers}"
+            f" retry={self._retry_policy.max_retries}>"
+        )

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING
 
 from castellum.core.task import Task, TaskKind
 from castellum.runtime.rate_limiter import ModelRateLimiter, RateLimiter
@@ -37,27 +37,39 @@ class Scheduler:
         self._default_timeout = default_timeout
         self._retry_policy = retry_policy
         self._metrics = metrics
+        self._in_flight: set[asyncio.Task[Any]] = set()
+
+        self._dispatch_table: dict[TaskKind, Callable[..., Any]] = {}
+
+    def _init_dispatch(self) -> None:
+        if self._dispatch_table:
+            return
+        self._dispatch_table = {
+            TaskKind.LLM_REMOTE: self._run_remote,
+            TaskKind.EMBEDDING: self._run_gpu,
+            TaskKind.LLM_LOCAL: self._run_gpu,
+        }
 
     async def submit(self, task: Task[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
+        self._init_dispatch()
         timeout = task.meta.timeout or self._default_timeout
         retry_policy = RetryPolicy(**(task.meta.retry_policy or {})) if task.meta.retry_policy else self._retry_policy
 
         async def _dispatch() -> Any:
             kind = task.meta.kind
-            if kind == TaskKind.LLM_REMOTE:
-                return await self._run_remote(task, args, kwargs)
-            elif kind in (TaskKind.EMBEDDING, TaskKind.LLM_LOCAL) and task.meta.device != "cpu":
-                return await self._run_gpu(task, args, kwargs)
-            elif inspect.iscoroutinefunction(task._fn) or inspect.isasyncgenfunction(task._fn):
+            handler = self._dispatch_table.get(kind)
+            if handler is not None and task.meta.device != "cpu":
+                return await handler(task, args, kwargs)
+            if inspect.iscoroutinefunction(task._fn) or inspect.isasyncgenfunction(task._fn):
                 return await self._run_async(task, args, kwargs)
-            else:
-                return await self._run_cpu(task, args, kwargs)
+            return await self._run_cpu(task, args, kwargs)
 
         with self._metrics.task_timer(task.__name__):
-            return await asyncio.wait_for(
-                retry_policy.execute(_dispatch),
+            result = await asyncio.wait_for(
+                retry_policy.execute(_dispatch, metrics=self._metrics, task_name=task.__name__),
                 timeout=timeout,
             )
+        return result
 
     async def map(
         self,
@@ -69,21 +81,19 @@ class Scheduler:
     ) -> list[Any]:
         if task.meta.batchable:
             return await self._map_batched(task, items, batch_size=batch_size, concurrency=concurrency)
-        else:
-            return await self._map_individual(task, items, concurrency=concurrency)
+        return await self._map_individual(task, items, concurrency=concurrency)
 
     async def _map_batched(self, task: Task[..., Any], items: list[Any], *, batch_size: int, concurrency: int | None) -> list[Any]:
         batches = [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
-        sem = asyncio.Semaphore(concurrency) if concurrency else None
+        sem = asyncio.Semaphore(concurrency) if concurrency else asyncio.Semaphore(4)
 
         async def run_batch(batch: list[Any]) -> Any:
-            if sem:
-                async with sem:
-                    return await self.submit(task, (batch,), {})
-            return await self.submit(task, (batch,), {})
+            async with sem:
+                return await self.submit(task, (batch,), {})
 
         async with asyncio.TaskGroup() as tg:
             coros = [tg.create_task(run_batch(b)) for b in batches]
+            self._in_flight.update(coros)
 
         result: list[Any] = []
         for t in coros:
@@ -95,16 +105,15 @@ class Scheduler:
         return result
 
     async def _map_individual(self, task: Task[..., Any], items: list[Any], *, concurrency: int | None) -> list[Any]:
-        sem = asyncio.Semaphore(concurrency) if concurrency else None
+        sem = asyncio.Semaphore(concurrency) if concurrency else asyncio.Semaphore(4)
 
         async def run_one(item: Any) -> Any:
-            if sem:
-                async with sem:
-                    return await self.submit(task, (item,), {})
-            return await self.submit(task, (item,), {})
+            async with sem:
+                return await self.submit(task, (item,), {})
 
         async with asyncio.TaskGroup() as tg:
             tasks = [tg.create_task(run_one(item)) for item in items]
+            self._in_flight.update(tasks)
 
         return [t.result() for t in tasks]
 
@@ -137,4 +146,15 @@ class Scheduler:
             return await task._fn(*args, **kwargs)
 
     async def aclose(self) -> None:
-        self._executor.shutdown(wait=True, cancel_futures=False)
+        for t in self._in_flight:
+            t.cancel()
+        if self._in_flight:
+            await asyncio.wait(self._in_flight, timeout=5.0)
+        self._executor.shutdown(wait=True, cancel_futures=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<Scheduler cpu={self._executor._max_workers}"
+            f" gpu_sem={self._gpu_sem._value}"
+            f" remote_sem={self._remote_sem._value}>"
+        )

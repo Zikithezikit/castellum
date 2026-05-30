@@ -15,3 +15,6 @@ class PrometheusExporter:
     def record_call(self, task_name: str, *, duration: float) -> None:
         self._calls.labels(task=task_name).inc()
         self._duration.labels(task=task_name).observe(duration)
+
+    def record_failure(self, task_name: str) -> None:
+        self._failures.labels(task=task_name).inc()

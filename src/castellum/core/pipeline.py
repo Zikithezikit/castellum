@@ -14,14 +14,18 @@ class Pipeline(Generic[P, R]):
         self.__name__ = fn.__name__
         self.__doc__ = fn.__doc__
         self._is_generator = inspect.isasyncgenfunction(fn)
+        self._is_async = inspect.iscoroutinefunction(fn) or self._is_generator
 
     async def _execute(self, *args: Any, **kwargs: Any) -> Any:
         if self._is_generator:
             return self._fn(*args, **kwargs)
-        return await cast(Awaitable[Any], self._fn(*args, **kwargs))
+        result = self._fn(*args, **kwargs)
+        if self._is_async:
+            return await cast(Awaitable[Any], result)
+        return result
 
     def __repr__(self) -> str:
-        return f"<Pipeline {self.__name__!r}>"
+        return f"<Pipeline {self.__name__!r} async={self._is_async}>"
 
 
 def pipeline(fn: Callable[P, R]) -> Pipeline[P, R]:

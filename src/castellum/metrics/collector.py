@@ -3,7 +3,14 @@ from __future__ import annotations
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Iterator
+
+
+class MetricsBackend(Enum):
+    NONE = "none"
+    PROMETHEUS = "prometheus"
+    OTEL = "otel"
 
 
 @dataclass
@@ -22,22 +29,29 @@ class MetricsCollector:
     def __init__(
         self,
         *,
-        backend: str = "none",
+        backend: str | MetricsBackend = MetricsBackend.NONE,
         namespace: str = "castellum",
         enable_traces: bool = False,
     ) -> None:
         self._namespace = namespace
-        self._backend = backend
         self._enable_traces = enable_traces
+        if isinstance(backend, str):
+            try:
+                backend = MetricsBackend(backend)
+            except ValueError:
+                backend = MetricsBackend.NONE
+        self._backend = backend
         self._stats: dict[str, TaskStats] = {}
         self._exporter = self._build_exporter(backend, namespace)
 
-    def _build_exporter(self, backend: str, namespace: str) -> Any:
-        if backend == "prometheus":
+    def _build_exporter(self, backend: MetricsBackend, namespace: str) -> Any:
+        if backend == MetricsBackend.PROMETHEUS:
             from castellum.metrics.prometheus import PrometheusExporter
+
             return PrometheusExporter(namespace=namespace)
-        elif backend == "otel":
+        if backend == MetricsBackend.OTEL:
             from castellum.metrics.otel import OtelExporter
+
             return OtelExporter(namespace=namespace)
         return None
 
@@ -47,12 +61,15 @@ class MetricsCollector:
         stats = self._stats.setdefault(task_name, TaskStats())
         try:
             yield
+            duration = time.perf_counter() - start
             stats.calls += 1
-            stats.total_duration_s += time.perf_counter() - start
+            stats.total_duration_s += duration
             if self._exporter:
-                self._exporter.record_call(task_name, duration=stats.total_duration_s)
+                self._exporter.record_call(task_name, duration=duration)
         except Exception:
             stats.failures += 1
+            if self._exporter:
+                self._exporter.record_failure(task_name)
             raise
 
     def record_retry(self, task_name: str) -> None:

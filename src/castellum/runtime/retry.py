@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import random
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from castellum.metrics.collector import MetricsCollector
 
 
 class RetryPolicy:
@@ -27,7 +30,12 @@ class RetryPolicy:
             ConnectionError,
         )
 
-    async def execute(self, fn: Callable[[], Awaitable[Any]]) -> Any:
+    async def execute(
+        self,
+        fn: Callable[[], Awaitable[Any]],
+        metrics: MetricsCollector | None = None,
+        task_name: str | None = None,
+    ) -> Any:
         attempt = 0
         last_exc: Exception | None = None
 
@@ -38,9 +46,11 @@ class RetryPolicy:
                 last_exc = exc
                 if attempt == self.max_retries:
                     break
+                if metrics and task_name:
+                    metrics.record_retry(task_name)
                 delay = min(self.base_delay * (2 ** attempt), self.max_delay)
                 if self.jitter:
-                    delay += random.uniform(0, self.base_delay)
+                    delay = random.uniform(0, delay)
                 await asyncio.sleep(delay)
                 attempt += 1
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator
 
 import httpx
 
@@ -13,12 +14,15 @@ class AsyncHTTPClient:
             timeout=timeout,
         )
 
-    async def post(self, path: str, *, json: dict[str, Any], stream: bool = False) -> Any:
-        if stream:
-            return self._client.stream("POST", path, json=json)
+    async def post(self, path: str, *, json: dict[str, Any]) -> Any:
         response = await self._client.post(path, json=json)
         response.raise_for_status()
         return response.json()
+
+    @asynccontextmanager
+    async def stream(self, path: str, *, json: dict[str, Any]) -> AsyncIterator[Any]:
+        async with self._client.stream("POST", path, json=json) as response:
+            yield response
 
     async def aclose(self) -> None:
         await self._client.aclose()

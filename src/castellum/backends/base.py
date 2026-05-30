@@ -10,7 +10,7 @@ class LLMClient(ABC):
     async def chat(
         self,
         *,
-        model: str,
+        model: str | None = None,
         messages: list[Any],
         **kwargs: Any,
     ) -> str:
@@ -20,7 +20,7 @@ class LLMClient(ABC):
     def stream_chat(
         self,
         *,
-        model: str,
+        model: str | None = None,
         messages: list[Any],
         **kwargs: Any,
     ) -> AsyncGenerator[str, None]:

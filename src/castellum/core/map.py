@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import warnings
 from collections.abc import Generator
 from typing import Any, Generic, TypeVar, TYPE_CHECKING
 
@@ -31,6 +32,11 @@ class MapProxy(Generic[R]):
 
         ctx = get_current_context()
         if ctx is None:
+            warnings.warn(
+                f"map() on {self._task} called outside a pipeline context — running sequentially with no concurrency.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             return await self._run_direct()
         return await ctx.scheduler.map(
             self._task,
@@ -40,9 +46,10 @@ class MapProxy(Generic[R]):
         )
 
     async def _run_direct(self) -> list[R]:
-        results = []
+        results: list[R] = []
         for item in self._iterable:
-            r = self._task._fn(item)
+            fn = self._task._fn
+            r = fn(item)
             if inspect.isawaitable(r):
                 r = await r
             results.append(r)
