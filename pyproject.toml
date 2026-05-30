@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "castellum"
-version = "0.2.0"
+version = "0.2.1"
 description = "AI pipeline orchestration with automatic async I/O, CPU, and GPU management"
 readme = "README.md"
 license = { text = "Unlicense" }
