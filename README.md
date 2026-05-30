@@ -18,6 +18,9 @@ pip install "castellum[all]"
 
 ```python
 from castellum import ai_task, pipeline, Runtime
+from castellum.backends.remote.openai import OpenAIClient
+
+client = OpenAIClient()
 
 @ai_task(kind="preprocess")
 def chunk_docs(docs: list[str]) -> list[str]:
@@ -25,11 +28,11 @@ def chunk_docs(docs: list[str]) -> list[str]:
 
 @ai_task(kind="embedding", device="cuda", batchable=True, max_batch_size=128)
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
-    return local_embedder.encode(chunks)   # your model here
+    return local_embedder.encode(chunks)
 
 @ai_task(kind="llm_remote", model="gpt-4.1-mini")
 async def answer(question: str, context: str) -> str:
-    return await openai_client.chat(
+    return await client.chat(
         model="gpt-4.1-mini",
         messages=[{"role": "user", "content": f"{context}\n\n{question}"}],
     )
@@ -48,11 +51,7 @@ runtime = Runtime(
     tokens_per_minute_limit=80_000,
 )
 
-# Inside async code:
 result = await runtime.run(rag_pipeline, docs, question)
-
-# Outside async code:
-result = runtime.run_sync(rag_pipeline, docs, question)
 ```
 
 ## Core concepts
@@ -63,6 +62,21 @@ result = runtime.run_sync(rag_pipeline, docs, question)
 | `@pipeline` | Decorates an async function or async generator as an orchestrated flow |
 | `task.map(items)` | Fan-out a task over a collection with automatic batching |
 | `Runtime` | Wires the event loop, thread pool, GPU workers, and rate limiters |
+
+## Running tests
+
+```bash
+# Install with dev dependencies
+pip install "castellum[dev]"
+
+# Run all tests
+pytest
+
+# Run remote backend tests (requires API endpoint)
+export OPENAI_BASE_URL=http://localhost:20128/v1
+export OPENAI_API_KEY=sk-...
+pytest tests/backends/
+```
 
 ## License
 

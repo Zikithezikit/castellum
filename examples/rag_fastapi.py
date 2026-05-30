@@ -4,6 +4,7 @@ Example: RAG pipeline served via FastAPI.
 Run with:
     uvicorn rag_fastapi:app --reload
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -12,25 +13,28 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from castellum import ai_task, pipeline, Runtime
+from castellum.backends.remote.openai import OpenAIClient
 
 runtime: Runtime
+llm: OpenAIClient
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runtime
+    global runtime, llm
+    llm = OpenAIClient()
     runtime = Runtime(
         max_cpu_workers=8,
         max_gpu_workers=2,
         max_concurrent_remote_calls=10,
         tokens_per_minute_limit=80_000,
         remote_limits={
-            "gpt-4.1-mini": {"requests_per_minute": 1500, "tokens_per_minute": 100_000}
+            "gpt-4.1-mini": {"requests_per_minute": 1500, "tokens_per_minute": 100_000},
         },
         retry_policy={"max_retries": 3, "base_delay": 0.5},
-        metrics_backend="prometheus",
     )
     yield
+    await llm.aclose()
     await runtime.aclose()
 
 
@@ -54,7 +58,10 @@ async def retrieve_top_k(vectors: list[list[float]], k: int = 5) -> str:
 
 @ai_task(kind="llm_remote", model="gpt-4.1-mini")
 async def answer(question: str, context: str) -> str:
-    return f"[stub answer] Q: {question}"
+    return await llm.chat(
+        model="gpt-4.1-mini",
+        messages=[{"role": "user", "content": f"{context}\n\n{question}"}],
+    )
 
 
 @pipeline
