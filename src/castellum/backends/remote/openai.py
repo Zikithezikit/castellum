@@ -15,7 +15,7 @@ class OpenAIClient(LLMClient):
         timeout: float = 60.0,
     ) -> None:
         try:
-            from openai import AsyncOpenAI  # type: ignore[import-not-found]
+            from openai import AsyncOpenAI
         except ImportError as e:
             raise ImportError("Install 'castellum[openai]' to use OpenAIClient.") from e
 
@@ -26,7 +26,7 @@ class OpenAIClient(LLMClient):
         self,
         *,
         model: str | None = None,
-        messages: list[dict[str, str]],
+        messages: list[Any],
         **kwargs: Any,
     ) -> str:
         response = await self._client.chat.completions.create(
@@ -40,18 +40,19 @@ class OpenAIClient(LLMClient):
         self,
         *,
         model: str | None = None,
-        messages: list[dict[str, str]],
+        messages: list[Any],
         **kwargs: Any,
     ) -> AsyncGenerator[str, None]:
+        from openai.lib.streaming.chat import ContentDeltaEvent
+
         async with self._client.chat.completions.stream(
             model=model or self._default_model,
             messages=messages,
             **kwargs,
         ) as stream:
             async for event in stream:
-                delta = event.choices[0].delta.content
-                if delta:
-                    yield delta
+                if isinstance(event, ContentDeltaEvent) and event.delta:
+                    yield event.delta
 
     async def aclose(self) -> None:
         await self._client.close()

@@ -11,7 +11,7 @@ class LLMClient(ABC):
         self,
         *,
         model: str,
-        messages: list[dict[str, str]],
+        messages: list[Any],
         **kwargs: Any,
     ) -> str:
         ...
@@ -21,7 +21,7 @@ class LLMClient(ABC):
         self,
         *,
         model: str,
-        messages: list[dict[str, str]],
+        messages: list[Any],
         **kwargs: Any,
     ) -> AsyncGenerator[str, None]:
         ...

@@ -26,7 +26,7 @@ class AnthropicClient(LLMClient):
         self,
         *,
         model: str | None = None,
-        messages: list[dict[str, str]],
+        messages: list[Any],
         max_tokens: int = 2048,
         **kwargs: Any,
     ) -> str:
@@ -42,7 +42,7 @@ class AnthropicClient(LLMClient):
         self,
         *,
         model: str | None = None,
-        messages: list[dict[str, str]],
+        messages: list[Any],
         max_tokens: int = 2048,
         **kwargs: Any,
     ) -> AsyncGenerator[str, None]:
