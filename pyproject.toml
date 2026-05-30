@@ -7,13 +7,13 @@ name = "castellum"
 version = "0.2.0"
 description = "AI pipeline orchestration with automatic async I/O, CPU, and GPU management"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Unlicense" }
 requires-python = ">=3.11"
 keywords = ["ai", "llm", "pipeline", "async", "gpu", "embeddings", "rag"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: The Unlicense (Unlicense)",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

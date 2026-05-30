@@ -100,4 +100,4 @@ pytest tests/backends/
 
 ## License
 
-MIT
+Unlicense — public domain. See [LICENSE](LICENSE).
