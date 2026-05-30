@@ -16,6 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
@@ -24,6 +25,11 @@ dependencies = [
     "tenacity>=8.3",
     "typing-extensions>=4.11",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Zikithezikit/castellum"
+Repository = "https://github.com/Zikithezikit/castellum"
+"Bug Tracker" = "https://github.com/Zikithezikit/castellum/issues"
 
 [project.optional-dependencies]
 openai = ["openai>=1.30"]
